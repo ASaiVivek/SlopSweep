@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.1 (unreleased)
+
+### Fixed
+
+- `session end` uses `SLOPSWEEP_SESSION` when `--id` is omitted (hooks/quickstart).
+- `apply-labels --apply` writes JSONL audit entries for keep/trash/archive actions.
+
+### Tests
+
+- Newline filenames, active-session scratch TTL, audit log, git label rejection, multi-line label validation.
+
 ## v0.1.0 (2025-09-28)
 
 ### Added

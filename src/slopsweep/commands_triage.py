@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from slopsweep.config import load_config
-from slopsweep.execute import create_verified_archive, move_to_trash
+from slopsweep.execute import AuditRecord, append_audit, create_verified_archive, move_to_trash
 from slopsweep.plan import ambiguous_paths
 from slopsweep.safety import EXIT_REFUSED, SafetyError, run_lock, validate_root
 from slopsweep.triage import build_triage_entry, validate_labels_file
@@ -47,14 +47,44 @@ def cmd_apply_labels(args: argparse.Namespace) -> int:
         return 1
     dry_run = not args.apply
     now = datetime.now(UTC)
+    ts = now.isoformat()
     try:
         with run_lock(root):
             for entry, target in labeled:
                 if entry.label == "keep":
                     print(f"keep: {entry.path}", flush=True)
+                    if not dry_run:
+                        append_audit(
+                            root,
+                            AuditRecord(
+                                timestamp=ts,
+                                action="keep",
+                                path=entry.path,
+                                bytes=0,
+                                dry_run=False,
+                                detail="apply-labels",
+                            ),
+                        )
                 elif entry.label == "delete":
+                    try:
+                        delete_bytes = target.lstat().st_size
+                    except OSError:
+                        delete_bytes = 0
                     dest = move_to_trash(root, target, now, dry_run=dry_run)
                     print(f"delete -> trash: {entry.path} ({dest})", flush=True)
+                    if not dry_run:
+                        size = delete_bytes
+                        append_audit(
+                            root,
+                            AuditRecord(
+                                timestamp=ts,
+                                action="trash",
+                                path=entry.path,
+                                bytes=size,
+                                dry_run=False,
+                                detail=str(dest),
+                            ),
+                        )
                 elif entry.label == "archive":
                     safe_name = entry.path.replace("/", "_")
                     archive_path = root / "archive" / f"triage-{safe_name}.tar.gz"
@@ -67,8 +97,21 @@ def cmd_apply_labels(args: argparse.Namespace) -> int:
                                 fp = Path(dirpath) / name
                                 if not fp.is_symlink():
                                     files.append(fp)
+                    total = sum(f.lstat().st_size for f in files)
                     create_verified_archive(archive_path, files, root, dry_run=dry_run)
                     print(f"archive: {entry.path} -> {archive_path}", flush=True)
+                    if not dry_run:
+                        append_audit(
+                            root,
+                            AuditRecord(
+                                timestamp=ts,
+                                action="archive",
+                                path=str(archive_path.relative_to(root)),
+                                bytes=total,
+                                dry_run=False,
+                                detail=entry.path,
+                            ),
+                        )
     except SafetyError as exc:
         print(exc.message, flush=True)
         return EXIT_REFUSED
