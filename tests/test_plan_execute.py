@@ -129,6 +129,46 @@ def test_git_work_tree_skipped(workspace: Path, frozen_now: datetime) -> None:
     assert tracked not in [a.path for a in actions]
 
 
+def test_newline_in_filename(workspace: Path, frozen_now: datetime) -> None:
+    sess = _session(workspace)
+    name = "line\nbreak.txt"
+    path = sess / "tmp" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("x", encoding="utf-8")
+    meta = json.loads((sess / ".session.json").read_text(encoding="utf-8"))
+    meta["ended_at"] = frozen_now.isoformat()
+    (sess / ".session.json").write_text(json.dumps(meta), encoding="utf-8")
+    cfg = Config(root=workspace)
+    actions = plan_run(workspace, cfg, frozen_now)
+    assert any(a.path.name == name for a in actions)
+
+
+def test_recent_scratch_not_in_plan(workspace: Path, frozen_now: datetime) -> None:
+    sess = _session(workspace)
+    recent = sess / "tmp" / "new.txt"
+    recent.write_text("x", encoding="utf-8")
+    cfg = Config(root=workspace, scratch_ttl_hours=24)
+    actions = plan_run(workspace, cfg, frozen_now)
+    assert recent not in [a.path for a in actions]
+
+
+def test_run_apply_writes_audit_log(workspace: Path, frozen_now: datetime) -> None:
+    sess = _session(workspace)
+    meta = json.loads((sess / ".session.json").read_text(encoding="utf-8"))
+    meta["ended_at"] = frozen_now.isoformat()
+    (sess / ".session.json").write_text(json.dumps(meta), encoding="utf-8")
+    scratch = sess / "tmp" / "gone.txt"
+    scratch.write_text("bye", encoding="utf-8")
+    cfg = Config(root=workspace)
+    actions = plan_run(workspace, cfg, frozen_now)
+    execute_plan(workspace, actions, dry_run=False, now=frozen_now)
+    log = workspace / "logs" / "slopsweep.jsonl"
+    assert log.is_file()
+    line = json.loads(log.read_text(encoding="utf-8").strip())
+    assert line["action"] == "trash"
+    assert line["dry_run"] is False
+
+
 def test_unicode_and_space_filenames(workspace: Path, frozen_now: datetime) -> None:
     sess = _session(workspace)
     name = "file with spaces 🚀.txt"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -21,3 +22,9 @@ def test_init_and_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("SLOPSWEEP_ROOT", str(root))
     assert main(["session", "new", "--id", "demo"]) == 0
     assert (root / "sessions" / "demo" / "tmp").is_dir()
+    monkeypatch.setenv("SLOPSWEEP_SESSION", "demo")
+    assert main(["session", "end"]) == 0
+    meta = json.loads(
+        (root / "sessions" / "demo" / ".session.json").read_text(encoding="utf-8")
+    )
+    assert meta["ended_at"] is not None

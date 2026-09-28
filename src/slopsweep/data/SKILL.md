@@ -5,7 +5,7 @@ description: Manual workspace sweep and triage for slopsweep-managed agent sessi
 
 # slopsweep skill
 
-Use when finishing work in a slopsweep-managed agent session.
+Use when finishing work in a slopsweep session directory.
 
 ## Before you stop
 
