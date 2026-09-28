@@ -1,0 +1,2 @@
+# Nightly safety net (cron example — adjust paths)
+0 3 * * * SLOPSWEEP_ROOT=$HOME/agent-work slopsweep run --apply >>$HOME/agent-work/logs/cron.log 2>&1
